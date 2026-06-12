@@ -1,0 +1,257 @@
+const ratingLabels = {1: "Lost", 2: "Shaky", 3: "Workable", 4: "Solid", 5: "Exam-ready"};
+const state = {config: null, dashboard: null, questions: [], queue: [], current: null, revealed: false, answerVersion: null, view: "dashboard"};
+
+if (window.mermaid) {
+  window.mermaid.initialize({startOnLoad: false, securityLevel: "strict", theme: "base"});
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  bindNavigation();
+  bindControls();
+  await loadData();
+  state.answerVersion = state.config.default_answer_version;
+  document.title = state.config.app_title;
+  document.getElementById("brand").textContent = state.config.app_title;
+  document.getElementById("subtitle").textContent = state.config.subtitle;
+  renderAll();
+});
+
+async function loadData() {
+  const [config, dashboard, questions] = await Promise.all([getJSON("/api/config"), getJSON("/api/dashboard"), getJSON("/api/questions")]);
+  state.config = config;
+  state.dashboard = dashboard;
+  state.questions = questions;
+}
+
+function bindNavigation() {
+  document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
+}
+
+function bindControls() {
+  document.querySelectorAll("[data-session]").forEach((button) => button.addEventListener("click", () => startSession(button.dataset.session)));
+  document.getElementById("next-button").addEventListener("click", selectNextQuestion);
+  document.getElementById("shuffle-button").addEventListener("click", () => {
+    state.queue = shuffle([...state.queue]);
+    renderReviewQueue();
+    if (state.queue.length) selectQuestion(state.queue[0]);
+  });
+  ["search-input", "topic-filter", "rating-filter"].forEach((id) => document.getElementById(id).addEventListener("input", renderQuestionTable));
+}
+
+function renderAll() {
+  renderDashboard();
+  renderTopicFilter();
+  renderQuestionTable();
+  if (!state.queue.length && state.dashboard?.suggested_queue?.length) state.queue = state.dashboard.suggested_queue.map((question) => question.number);
+  renderReviewQueue();
+  renderQuestionPanel();
+  renderAnswerPanel();
+}
+
+function setView(viewName) {
+  state.view = viewName;
+  document.querySelectorAll(".view").forEach((view) => view.classList.toggle("is-active", view.id === `${viewName}-view`));
+  document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === viewName));
+}
+
+function renderDashboard() {
+  const summary = state.dashboard.summary;
+  const average = summary.average_rating === null ? "n/a" : summary.average_rating;
+  document.getElementById("summary").innerHTML = [metric(summary.total_questions, "Questions"), metric(summary.rated_questions, "Rated"), metric(summary.unrated_questions, "Unrated"), metric(average, "Average rating")].join("");
+  document.getElementById("suggested-queue").innerHTML = renderQuestionList(state.dashboard.suggested_queue);
+  document.getElementById("weakest-list").innerHTML = renderQuestionList(state.dashboard.weakest_questions.slice(0, 8));
+  document.getElementById("coverage-note").textContent = `${summary.rated_questions}/${summary.total_questions} rated`;
+  renderTopicCoverage();
+}
+
+function metric(value, label) {
+  return `<div class="metric"><span class="metric-value">${escapeHTML(String(value))}</span><span class="metric-label">${escapeHTML(label)}</span></div>`;
+}
+
+function renderQuestionList(questions) {
+  if (!questions.length) return `<div class="empty">No questions to show.</div>`;
+  return questions.map((question) => `<button class="question-item" data-question="${question.number}"><span class="question-number">${padNumber(question.number)}</span><span><span class="question-title">${escapeHTML(question.title)}</span><span class="question-topic">${escapeHTML(shortTopic(question.topic))}</span></span>${ratingPill(question.progress?.rating)}</button>`).join("");
+}
+
+function renderTopicCoverage() {
+  document.getElementById("topic-coverage").innerHTML = state.dashboard.topic_coverage.map((topic) => {
+    const average = topic.average_rating === null ? "n/a" : topic.average_rating;
+    return `<div class="topic-row"><div><strong>${escapeHTML(shortTopic(topic.topic))}</strong><div class="subtle">${topic.rated}/${topic.total} rated, ${topic.weak_count} weak or unrated</div></div><div class="progress-track"><div class="progress-fill" style="width: ${topic.coverage_percent}%"></div></div><div>${topic.coverage_percent}%</div><div>${average}</div></div>`;
+  }).join("");
+}
+
+function startSession(mode) {
+  let queue = [];
+  if (mode === "balanced") queue = state.dashboard.suggested_queue.map((question) => question.number);
+  else if (mode === "weakest") queue = state.dashboard.weakest_questions.map((question) => question.number);
+  else if (mode === "unrated") queue = state.questions.filter((question) => !question.progress?.rating).map((question) => question.number);
+  else if (mode === "random") queue = shuffle(state.questions.map((question) => question.number)).slice(0, 12);
+  state.queue = queue;
+  renderReviewQueue();
+  setView("review");
+  if (queue.length) selectQuestion(queue[0]);
+  else { state.current = null; renderQuestionPanel("No questions match this session."); }
+}
+
+async function selectQuestion(number) {
+  state.current = await getJSON(`/api/questions/${number}`);
+  state.revealed = false;
+  state.answerVersion = state.config.default_answer_version;
+  renderReviewQueue();
+  renderQuestionPanel();
+  renderAnswerPanel();
+}
+
+function selectNextQuestion() {
+  if (!state.queue.length) return;
+  const index = state.queue.indexOf(state.current?.number);
+  selectQuestion(state.queue[index + 1] ?? state.queue[0]);
+}
+
+function renderReviewQueue() {
+  const list = document.getElementById("review-queue");
+  if (!state.queue.length) { list.innerHTML = `<div class="empty">Start a session from the dashboard.</div>`; return; }
+  list.innerHTML = state.queue.map((number) => {
+    const question = state.questions.find((item) => item.number === number);
+    if (!question) return "";
+    const active = state.current?.number === number ? " is-active" : "";
+    return `<button class="rail-item${active}" data-question="${number}"><span class="rail-number">${padNumber(number)}</span><span><span class="rail-title">${escapeHTML(question.title)}</span><span class="rail-meta">${ratingText(question.progress?.rating)}</span></span></button>`;
+  }).join("");
+}
+
+function renderQuestionPanel(message = "") {
+  const panel = document.getElementById("question-panel");
+  if (message) { panel.innerHTML = `<p class="empty">${escapeHTML(message)}</p>`; document.getElementById("answer-panel").classList.add("is-hidden"); return; }
+  if (!state.current) { panel.innerHTML = `<p class="empty">Choose a review queue or open a question.</p>`; return; }
+  const question = state.current;
+  const rating = question.progress?.rating ?? null;
+  panel.innerHTML = `<div class="review-meta"><span class="tag">Question ${padNumber(question.number)}</span><span class="tag">${escapeHTML(shortTopic(question.topic))}</span><span class="tag">${escapeHTML(ratingText(rating))}</span></div><h2>${escapeHTML(question.title)}</h2><p class="question-text">${escapeHTML(question.original_question)}</p><div class="actions"><button class="primary" id="reveal-button">${state.revealed ? "Hide answer" : "Reveal answer"}</button><button class="ghost" id="open-note-button">Show note path</button></div><div class="rating-control">${[1, 2, 3, 4, 5].map((value) => ratingButton(value, rating)).join("")}<span class="rating-help">1 = lost, 3 = workable, 5 = exam-ready</span></div>`;
+  document.getElementById("reveal-button").addEventListener("click", () => { state.revealed = !state.revealed; renderQuestionPanel(); renderAnswerPanel(); });
+  document.getElementById("open-note-button").addEventListener("click", () => showToast(question.path));
+  panel.querySelectorAll(".rating-button").forEach((button) => button.addEventListener("click", () => saveRating(Number(button.dataset.rating))));
+}
+
+function ratingButton(value, currentRating) {
+  const selected = value === currentRating ? " is-selected" : "";
+  return `<button class="rating-button${selected}" data-rating="${value}" title="${ratingLabels[value]}">${value}</button>`;
+}
+
+function renderAnswerPanel() {
+  const panel = document.getElementById("answer-panel");
+  clearMath(panel);
+  if (!state.current || !state.revealed) { panel.classList.add("is-hidden"); panel.innerHTML = ""; return; }
+  const answer = state.current.versions?.[state.answerVersion] ?? Object.values(state.current.versions ?? {})[0];
+  if (!answer) { panel.classList.add("is-hidden"); panel.innerHTML = ""; return; }
+  const sections = orderedSectionNames(answer, state.answerVersion).map((sectionName) => `<section class="answer-section"><h3>${escapeHTML(sectionName)}</h3>${renderMarkdown(answer.sections[sectionName])}</section>`).join("");
+  panel.innerHTML = `<div class="answer-version-bar"><div><strong>${escapeHTML(answerLabel(state.answerVersion))} answer</strong><div class="subtle">${escapeHTML(answer.path)}</div></div><div class="segmented">${Object.entries(state.config.answer_versions).map(([version, item]) => `<button class="${version === state.answerVersion ? "is-active" : ""}" data-answer-version="${version}">${escapeHTML(item.label)}</button>`).join("")}</div></div>${sections}`;
+  panel.classList.remove("is-hidden");
+  panel.querySelectorAll("[data-answer-version]").forEach((button) => button.addEventListener("click", () => { state.answerVersion = button.dataset.answerVersion; renderAnswerPanel(); }));
+  void renderRichContent(panel);
+}
+
+function orderedSectionNames(answer, version) {
+  const allSections = answer.section_order ?? Object.keys(answer.sections ?? {});
+  const preferred = state.config.preferred_section_order?.[version];
+  if (!preferred) return allSections.filter((sectionName) => answer.sections?.[sectionName]);
+  return [...preferred.filter((sectionName) => answer.sections?.[sectionName]), ...allSections.filter((sectionName) => !preferred.includes(sectionName))];
+}
+
+async function saveRating(rating) {
+  if (!state.current) return;
+  await postJSON(`/api/questions/${state.current.number}/rating`, {rating});
+  showToast(`Saved rating ${rating}: ${ratingLabels[rating]}`);
+  await loadData();
+  state.current = await getJSON(`/api/questions/${state.current.number}`);
+  renderAll();
+  setView("review");
+}
+
+function renderTopicFilter() {
+  const topics = [...new Set(state.questions.map((question) => question.topic))].sort();
+  const select = document.getElementById("topic-filter");
+  select.innerHTML = [`<option value="all">All topics</option>`, ...topics.map((topic) => `<option value="${escapeAttribute(topic)}">${escapeHTML(shortTopic(topic))}</option>`)].join("");
+}
+
+function renderQuestionTable() {
+  const search = document.getElementById("search-input").value.trim().toLowerCase();
+  const topic = document.getElementById("topic-filter").value;
+  const ratingFilter = document.getElementById("rating-filter").value;
+  const rows = state.questions.filter((question) => {
+    const rating = question.progress?.rating;
+    const searchable = `${question.title} ${question.topic} ${question.original_question}`.toLowerCase();
+    if (search && !searchable.includes(search)) return false;
+    if (topic !== "all" && question.topic !== topic) return false;
+    if (ratingFilter === "unrated" && rating) return false;
+    if (!["all", "unrated"].includes(ratingFilter) && String(rating) !== ratingFilter) return false;
+    return true;
+  });
+  document.getElementById("question-table").innerHTML = `<div class="question-row table-head"><span>No.</span><span>Question</span><span>Topic</span><span>Rating</span><span>Action</span></div>${rows.length ? rows.map(renderQuestionRow).join("") : `<div class="empty">No matching questions.</div>`}`;
+}
+
+function renderQuestionRow(question) {
+  return `<div class="question-row"><span class="question-number">${padNumber(question.number)}</span><span><span class="question-title">${escapeHTML(question.title)}</span><span class="question-topic">${escapeHTML(question.original_question)}</span></span><span>${escapeHTML(shortTopic(question.topic))}</span><span>${ratingPill(question.progress?.rating)}</span><button data-question="${question.number}">Review</button></div>`;
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-question]");
+  if (!button) return;
+  const number = Number(button.dataset.question);
+  if (!state.queue.includes(number)) state.queue = [number, ...state.queue.filter((item) => item !== number)];
+  setView("review");
+  selectQuestion(number);
+});
+
+function renderMarkdown(markdown) {
+  const lines = markdown.trim().split(/\r?\n/);
+  const html = [];
+  let listOpen = false;
+  const closeList = () => { if (listOpen) { html.push(`</${listOpen}>`); listOpen = false; } };
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed) { closeList(); continue; }
+    if (trimmed.startsWith("```")) {
+      closeList();
+      const language = trimmed.slice(3).trim();
+      const block = [];
+      index += 1;
+      while (index < lines.length && !lines[index].trim().startsWith("```")) { block.push(lines[index]); index += 1; }
+      html.push(language === "mermaid" ? `<div class="mermaid diagram-block">${escapeHTML(block.join("\n"))}</div>` : `<pre class="code-block"><code>${escapeHTML(block.join("\n"))}</code></pre>`);
+      continue;
+    }
+    if (/^#{3,6}\s+/.test(trimmed)) { closeList(); const level = Math.min(Number(trimmed.match(/^#+/)[0].length) + 1, 6); html.push(`<h${level}>${renderInline(trimmed.replace(/^#{3,6}\s+/, ""))}</h${level}>`); continue; }
+    if (trimmed === "$$") { closeList(); const block = []; index += 1; while (index < lines.length && lines[index].trim() !== "$$") { block.push(lines[index]); index += 1; } html.push(`<div class="math-block">$$\n${escapeHTML(block.join("\n"))}\n$$</div>`); continue; }
+    if (isTableStart(lines, index)) { closeList(); const tableLines = [lines[index], lines[index + 1]]; index += 2; while (index < lines.length && isTableRow(lines[index])) { tableLines.push(lines[index]); index += 1; } index -= 1; html.push(renderTable(tableLines)); continue; }
+    if (trimmed.startsWith("![")) { closeList(); html.push(renderImage(trimmed)); continue; }
+    if (trimmed.startsWith("- ") || /^\d+\.\s+/.test(trimmed)) { const ordered = /^\d+\.\s+/.test(trimmed); const tag = ordered ? "ol" : "ul"; if (!listOpen) { html.push(`<${tag}>`); listOpen = tag; } else if (listOpen !== tag) { closeList(); html.push(`<${tag}>`); listOpen = tag; } const itemText = ordered ? trimmed.replace(/^\d+\.\s+/, "") : trimmed.slice(2); html.push(`<li>${renderInline(itemText)}</li>`); continue; }
+    closeList();
+    html.push(trimmed.startsWith(">") ? `<blockquote>${renderInline(trimmed.slice(1).trim())}</blockquote>` : `<p>${renderInline(trimmed)}</p>`);
+  }
+  closeList();
+  return html.join("");
+}
+
+function renderInline(value) { return escapeHTML(value).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>"); }
+function isTableStart(lines, index) { return isTableRow(lines[index]) && isTableSeparator(lines[index + 1] ?? ""); }
+function isTableRow(line) { const trimmed = line.trim(); return trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.includes("|"); }
+function isTableSeparator(line) { const cells = splitTableCells(line); return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim())); }
+function splitTableCells(line) { return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|"); }
+function renderTable(lines) { const headerCells = splitTableCells(lines[0]); const bodyRows = lines.slice(2).map(splitTableCells); return `<div class="table-wrap"><table><thead><tr>${headerCells.map((cell) => `<th>${renderInline(cell.trim())}</th>`).join("")}</tr></thead><tbody>${bodyRows.map((row) => `<tr>${row.map((cell) => `<td>${renderInline(cell.trim())}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`; }
+async function renderRichContent(container) { await renderDiagrams(container); await renderMath(container); }
+async function renderMath(container) { if (!window.MathJax?.typesetPromise) return; try { clearMath(container); await window.MathJax.typesetPromise([container]); } catch (error) { console.error("MathJax rendering failed", error); showToast("Formula rendering failed"); } }
+function clearMath(container) { if (window.MathJax?.typesetClear) window.MathJax.typesetClear([container]); }
+async function renderDiagrams(container) { if (!window.mermaid?.run) return; const diagrams = Array.from(container.querySelectorAll(".mermaid:not([data-processed])")); for (const diagram of diagrams) { try { await window.mermaid.run({nodes: [diagram]}); normalizeDiagramSize(diagram); } catch (error) { console.error("Mermaid rendering failed", error); diagram.classList.add("diagram-error"); diagram.textContent = "Diagram rendering failed."; showToast("Diagram rendering failed"); } } }
+function normalizeDiagramSize(diagram) { const svg = diagram.querySelector("svg"); const viewBox = svg?.getAttribute("viewBox"); if (!svg || !viewBox) return; const [, , width, height] = viewBox.split(/\s+/).map(Number); if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return; svg.style.width = `${Math.ceil(width)}px`; svg.style.maxWidth = "none"; svg.style.height = "auto"; }
+function renderImage(line) { const match = line.match(/!\[([^\]]*)]\(([^)]+)\)/); if (!match) return `<p>${renderInline(line)}</p>`; const alt = match[1] || "Note image"; const src = normalizeImagePath(match[2]); return `<figure><img class="note-image" src="${escapeAttribute(src)}" alt="${escapeAttribute(alt)}" loading="lazy" /><figcaption class="subtle">${escapeHTML(alt)}</figcaption></figure>`; }
+function normalizeImagePath(rawPath) { let path = rawPath.trim(); if (path.startsWith("<") && path.endsWith(">")) path = path.slice(1, -1); path = path.replace(/^(\.\.\/)+/, ""); if (path.startsWith("assets/")) return `/${path.split("/").map(encodeURIComponent).join("/")}`; return path; }
+function ratingPill(rating) { return `<span class="pill">${escapeHTML(ratingText(rating))}</span>`; }
+function ratingText(rating) { return rating ? `${rating}: ${ratingLabels[rating]}` : "Unrated"; }
+function shortTopic(topic) { return topic.replace(/^Topic \d+ -\s*/, ""); }
+function padNumber(number) { return String(number).padStart(2, "0"); }
+function answerLabel(version) { return state.config.answer_versions?.[version]?.label ?? version; }
+function shuffle(items) { for (let index = items.length - 1; index > 0; index -= 1) { const swap = Math.floor(Math.random() * (index + 1)); [items[index], items[swap]] = [items[swap], items[index]]; } return items; }
+async function getJSON(url) { const response = await fetch(url); if (!response.ok) throw new Error(`GET ${url} failed`); return response.json(); }
+async function postJSON(url, payload) { const response = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(payload)}); if (!response.ok) throw new Error(`POST ${url} failed`); return response.json(); }
+function showToast(message) { const toast = document.getElementById("toast"); toast.textContent = message; toast.classList.add("is-visible"); window.setTimeout(() => toast.classList.remove("is-visible"), 2200); }
+function escapeHTML(value) { return value.replace(/[&<>"]/g, (char) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"})[char]); }
+function escapeAttribute(value) { return escapeHTML(value); }

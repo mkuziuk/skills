@@ -1,0 +1,17 @@
+.DS_Store
+Thumbs.db
+
+# Local editor and Python state
+.idea/
+.vscode/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local environments and secrets
+.env
+.env.*
+.venv/
+venv/
+

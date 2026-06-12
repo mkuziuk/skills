@@ -1,0 +1,4 @@
+interface:
+  display_name: "Oral Exam Trainer"
+  short_description: "Build local oral exam trainer apps"
+  default_prompt: "Use $oral-exam-trainer to turn my exam question list and study notes into a local oral exam trainer."
