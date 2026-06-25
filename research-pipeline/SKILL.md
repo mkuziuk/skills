@@ -28,7 +28,7 @@ Use a short lowercase slug derived from the objective. Keep all workflow artifac
 1. Clarify only when missing details would materially change the research direction, source universe, or decision criteria.
 2. Read `references/run-bundle.md` before writing artifacts.
 3. Write `manifest.md` and `brief.md` in the artifact root with the objective, assumptions, mode, task list, and success criteria.
-4. Split the work into 3-6 bounded research tasks unless the request is narrow enough for fewer.
+4. Split the work into 3-10 bounded research tasks unless the request is narrow enough for fewer.
 5. If the user explicitly allowed subagents, read `references/roles.md` and delegate only self-contained researcher or reviewer tasks. Otherwise, produce the same memo structure sequentially.
 6. Gather evidence with available file inspection, local context, and web sources when current or external information is needed. Keep important claims traceable to sources.
 7. Write one memo per task under `agents/<task-id>.md`.
