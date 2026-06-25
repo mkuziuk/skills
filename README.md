@@ -5,7 +5,7 @@ skills.
 
 ## Skills
 
-- `codex-research-pipeline`: structured, source-grounded research workflows that
+- `research-pipeline`: structured, source-grounded research workflows that
   produce an executive summary.
 - `frontend-skill`: guidance for visually strong landing pages, apps, prototypes,
   demos, and game UI.

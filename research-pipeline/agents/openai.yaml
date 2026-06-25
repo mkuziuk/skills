@@ -1,4 +1,4 @@
 interface:
   display_name: "Research Pipeline"
   short_description: "Structured source-grounded research workflows"
-  default_prompt: "Use $codex-research-pipeline to run a structured research workflow for this task."
+  default_prompt: "Use $research-pipeline to run a structured research workflow for this task."

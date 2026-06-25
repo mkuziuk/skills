@@ -1,9 +1,9 @@
 ---
-name: codex-research-pipeline
+name: research-pipeline
 description: Use for structured, source-grounded research workflows where Codex should clarify an objective, split it into bounded research tasks, gather evidence, optionally coordinate delegated researcher or reviewer passes when the user explicitly allows subagents, and produce an executive summary with confidence, risks, and next questions.
 ---
 
-# Codex Research Pipeline
+# Research Pipeline
 
 Use this skill to run a visible research workflow that turns a broad question into bounded tasks, evidence memos, review, and an executive summary.
 
