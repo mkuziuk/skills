@@ -1,6 +1,6 @@
 ---
 name: oral-exam-trainer
-description: Build reusable local oral-exam trainer apps from Markdown or Obsidian study material. Use when Codex needs to turn an exam question list, study notes, or a vault into an interactive self-check web app with answer reveal, light and complete answer versions, confidence ratings, dashboard queues, MathJax formulas, and Mermaid diagrams.
+description: Build reusable local oral-exam trainer apps from Markdown or Obsidian study material. Use when an AI agent needs to turn an exam question list, study notes, or a vault into an interactive self-check web app with answer reveal, light and complete answer versions, confidence ratings, dashboard queues, MathJax formulas, and Mermaid diagrams.
 ---
 
 # Oral Exam Trainer
