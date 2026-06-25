@@ -1,6 +1,6 @@
 ---
 name: research-pipeline
-description: Use for structured, source-grounded research workflows where Codex should clarify an objective, split it into bounded research tasks, gather evidence, optionally coordinate delegated researcher or reviewer passes when the user explicitly allows subagents, and produce an executive summary with confidence, risks, and next questions.
+description: Use for structured, source-grounded research workflows where an AI agent should clarify an objective, split it into bounded research tasks, gather evidence, optionally coordinate delegated researcher or reviewer passes when the user explicitly allows subagents, and produce an executive summary with confidence, risks, and next questions.
 ---
 
 # Research Pipeline
@@ -18,8 +18,8 @@ Recognize these user controls when present:
 
 If the user does not provide an artifact root, choose a contextual default and announce it before writing:
 
-- Projectless Codex thread: `work/<task-slug>/`
-- Target repo or project workspace: `codex/<task-slug>/`
+- Projectless chat or scratch workspace: `work/<task-slug>/`
+- Target repo or project workspace: `research/<task-slug>/`
 
 Use a short lowercase slug derived from the objective. Keep all workflow artifacts inside the chosen root.
 

@@ -6,8 +6,8 @@ Use one artifact root per workflow. Keep every generated file for the workflow i
 
 Respect `artifact root: <path>` exactly when it is safe to do so. If no root is given:
 
-- Use `work/<task-slug>/` for projectless Codex threads.
-- Use `codex/<task-slug>/` inside a target repo or project workspace.
+- Use `work/<task-slug>/` for projectless chats or scratch workspaces.
+- Use `research/<task-slug>/` inside a target repo or project workspace.
 
 Announce the chosen artifact root before writing files. Use lowercase slugs with letters, digits, and hyphens.
 
