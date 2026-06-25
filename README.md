@@ -1,7 +1,6 @@
-# Codex Skills
+# Useful Skills
 
-Custom global Codex skills from `~/.codex/skills`, excluding built-in `.system`
-skills.
+Reusable skills for AI coding harnesses and agent workflows.
 
 ## Skills
 
@@ -15,12 +14,3 @@ skills.
   Markdown or Obsidian study material.
 - `security-threat-model`: repository-grounded AppSec threat modeling workflow
   and report template.
-
-## Install
-
-To install these skills into another Codex environment:
-
-```bash
-mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-rsync -a --exclude='.git' ./ "${CODEX_HOME:-$HOME/.codex}/skills/"
-```
