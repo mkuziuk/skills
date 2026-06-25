@@ -4,6 +4,7 @@ Reusable skills for AI coding harnesses and agent workflows.
 
 ## Skills
 
+- `caveman`: terse technical communication mode for concise answers.
 - `research-pipeline`: structured, source-grounded research workflows that
   produce an executive summary.
 - `frontend-skill`: guidance for visually strong landing pages, apps, prototypes,

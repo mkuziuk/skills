@@ -1,0 +1,4 @@
+interface:
+  display_name: "Caveman"
+  short_description: "Terse technical communication mode"
+  default_prompt: "Use $caveman to answer in terse technical communication mode."
