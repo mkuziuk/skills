@@ -5,6 +5,8 @@ skills.
 
 ## Skills
 
+- `codex-research-pipeline`: structured, source-grounded research workflows that
+  produce an executive summary.
 - `frontend-skill`: guidance for visually strong landing pages, apps, prototypes,
   demos, and game UI.
 - `jupyter-notebook`: templates and helpers for creating reproducible Jupyter
@@ -22,4 +24,3 @@ To install these skills into another Codex environment:
 mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
 rsync -a --exclude='.git' ./ "${CODEX_HOME:-$HOME/.codex}/skills/"
 ```
-
